@@ -195,6 +195,38 @@ nova-ai-chatbot/
 
 ---
 
+## Deploy to Vercel
+
+The project is ready to deploy as a single Vercel Function (FastAPI is detected
+automatically; `pyproject.toml` pins the entrypoint to `app.main:app`).
+
+1. **Push this repo to GitHub** and import it in Vercel
+   (vercel.com → *Add New Project* → GitHub repo).
+
+2. **Set the environment variables** in Vercel:
+   Project → *Settings → Environment Variables*, add for **Production**:
+   ```
+   AI_API_KEY=<your_api_key>
+   AI_BASE_URL=https://api.groq.com/openai/v1
+   AI_MODEL=qwen/qwen3.8-27b
+   ```
+   (If you use a different provider, set `AI_BASE_URL`/`AI_MODEL` accordingly.)
+
+3. **Deploy.** After the build finishes, open your app URL and verify the health
+   endpoint returns `"api_key_configured": true`:
+   ```
+   https://<your-project>.vercel.app/api/health
+   ```
+
+4. **If you get `500 FUNCTION_INVOCATION_FAILED`:** redeploy after pushing the
+   current commit, then check *Logs* in Vercel for the exact traceback. Common
+   causes are a missing env var or a provider/model that cannot be reached.
+
+> Your local `.env` is gitignored — on Vercel the key comes only from
+> Vercel's own Environment Variables.
+
+---
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
