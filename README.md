@@ -16,7 +16,8 @@ and plain **HTML, CSS, JavaScript** (frontend). It uses any OpenAI-compatible ch
 - Loading indicator while Nova thinks.
 - Empty messages are blocked.
 - Clear conversation button.
-- Conversation history is kept during the current browser session.
+- Conversation history is saved in your browser: reopen past chats anytime from
+  the top-bar **History** panel (localStorage, per browser).
 - Helpful error messages when the API key is missing or a request fails.
 
 ---

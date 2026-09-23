@@ -29,6 +29,14 @@
         <span class="imagine-label">Imagine</span>
       </button>
 
+      <button class="nav-btn icon-only" id="history-btn" type="button" title="History" aria-label="History">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 6v6l4 2" />
+        </svg>
+      </button>
+
       <button class="nav-btn icon-only" id="settings-btn" type="button" title="Settings" aria-label="Settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -95,6 +103,29 @@
       </div>
     </div>
   </main>
+
+  <div id="history-backdrop" class="history-backdrop hidden"></div>
+
+  <aside id="history-panel" class="history-panel" aria-label="Chat history">
+    <div class="history-header">
+      <h2 class="history-title">History</h2>
+      <div class="history-header-actions">
+        <button class="history-new" id="history-new-btn" type="button" title="Start a new conversation">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+        <button class="history-close" id="history-close-btn" type="button" title="Close" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="history-list" id="history-list"></div>
+  </aside>
 
   <div id="error-bar" class="error-bar hidden"></div>
 
