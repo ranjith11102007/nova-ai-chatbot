@@ -227,6 +227,38 @@ automatically; `pyproject.toml` pins the entrypoint to `app.main:app`).
 
 ---
 
+## Deploy to Render (free)
+
+This deploys the **real FastAPI + AI backend** so the public site behaves exactly
+like your local terminal. The repo already contains a `render.yaml` blueprint.
+
+1. **Push this repo to GitHub** (already done if you cloned from
+   `ranjith11102007/nova-ai-chatbot`).
+
+2. **Create a free Render account** at https://render.com.
+
+3. In the Render dashboard click **New +** → **Blueprint** and pick this
+   repository (`nova-ai-chatbot`). Render reads `render.yaml` automatically.
+
+4. When prompted, set the secret environment variable **`AI_API_KEY`** to your
+   real key (from your AI provider). It is stored only in Render, never in git.
+
+5. Click **Apply** → the service builds, then deploys. Your app URL is like:
+   ```
+   https://nova-ai-chatbot.onrender.com
+   ```
+   Verify the backend is live:
+   ```
+   https://nova-ai-chatbot.onrender.com/api/health
+   ```
+   → responds `{"status":"ok","api_key_configured":true,"model":"<your model>"}`.
+
+> **Free tier note:** Render sleeps the service after ~15 minutes of no traffic.
+> The first request after it wakes up may take about 50 seconds to load — that is
+> normal and it stays fast afterwards.
+
+---
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

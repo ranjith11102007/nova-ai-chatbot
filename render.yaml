@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: nova-ai-chatbot
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/health
+    envVars:
+      - key: AI_BASE_URL
+        value: "https://api.groq.com/openai/v1"
+      - key: AI_MODEL
+        value: "qwen/qwen3.8-27b"
+      - key: AI_API_KEY
+        sync: false
