@@ -69,79 +69,40 @@
 
     <div class="composer-wrap">
       <div class="composer" id="composer">
-        <div class="attachments-bar hidden" id="attachments-bar" aria-live="polite"></div>
+        <textarea
+          id="user-input"
+          class="user-input"
+          rows="1"
+          placeholder="Type / to use slash commands"
+          maxlength="4000"
+        ></textarea>
 
-        <div class="composer-row">
-          <button class="plus-btn" id="plus-btn" type="button" title="Attach file"
-                  aria-label="Attach file" aria-haspopup="true" aria-expanded="false">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        <div class="composer-controls">
+          <button class="plus-btn" id="plus-btn" type="button" title="Add" aria-label="Add">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
 
-          <textarea
-            id="user-input"
-            class="user-input"
-            rows="1"
-            placeholder="Ask Nova..."
-            maxlength="4000"
-          ></textarea>
-
-          <button id="mic-btn" class="mic-btn" type="button" title="Start voice chat"
-                  aria-label="Start voice chat">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+          <div class="composer-right">
+            <span class="fast-label">Fast</span>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
             </svg>
-          </button>
-
-          <button id="send-btn" class="send-btn" type="button" title="Send" aria-label="Send">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 19V5M5 12l7-7 7 7" />
-            </svg>
-          </button>
-        </div>
-
-        <div id="attach-menu" class="attach-menu hidden" role="menu" aria-label="Attach options">
-          <button type="button" role="menuitem" data-kind="image" aria-label="Upload image">
-            <span aria-hidden="true">📷</span> Upload Image
-          </button>
-          <button type="button" role="menuitem" data-kind="document" aria-label="Upload document">
-            <span aria-hidden="true">📄</span> Upload Document
-          </button>
-          <button type="button" role="menuitem" data-kind="file" aria-label="Upload file">
-            <span aria-hidden="true">📎</span> Upload File
-          </button>
-          <button type="button" role="menuitem" data-kind="camera" class="touch-only"
-                  aria-label="Take photo">
-            <span aria-hidden="true">📸</span> Take Photo
-          </button>
-          <button type="button" role="menuitem" data-kind="gallery" class="touch-only"
-                  aria-label="Choose from gallery">
-            <span aria-hidden="true">🖼️</span> Choose from Gallery
-          </button>
+            <button id="send-btn" class="send-btn" type="button" title="Send" aria-label="Send">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </main>
-
-  <!-- Hidden file pickers -->
-  <input type="file" id="file-image-input" accept="image/png,image/jpeg,image/webp" hidden />
-  <input type="file" id="file-doc-input" accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
-  <input type="file" id="file-generic-input" accept="image/*,.txt,.pdf,.docx" hidden />
-  <input type="file" id="camera-input" accept="image/*" capture="environment" hidden />
-  <input type="file" id="gallery-input" accept="image/*" hidden />
-
-  <!-- Drag & drop overlay -->
-  <div id="drop-zone" class="drop-zone hidden" aria-hidden="true">
-    <div class="drop-zone-box">
-      <span class="drop-icon" aria-hidden="true">⬆</span>
-      <span>Drop file here</span>
-    </div>
-  </div>
 
   <div id="history-backdrop" class="history-backdrop hidden"></div>
 
@@ -163,120 +124,10 @@
         </button>
       </div>
     </div>
-    <div class="history-search">
-      <input id="history-search" type="search" placeholder="Search chats"
-             aria-label="Search chats" autocomplete="off" />
-    </div>
     <div class="history-list" id="history-list"></div>
   </aside>
 
   <div id="error-bar" class="error-bar hidden"></div>
-
-  <!-- Voice chat screen -->
-  <section id="voice-screen" class="voice-screen hidden" aria-label="Voice chat">
-    <div class="voice-topbar">
-      <button id="voice-back-btn" class="voice-icon-btn" type="button" aria-label="Back to text chat">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-      </button>
-      <div id="voice-status-pill" class="voice-status-pill hidden" role="status">Connecting…</div>
-      <div class="voice-topbar-spacer"></div>
-    </div>
-
-    <div class="voice-main">
-      <div id="voice-orb" class="voice-orb idle" role="img" aria-label="Nova voice assistant indicator"></div>
-      <div id="voice-state-title" class="voice-state-title">Voice chat with Nova</div>
-      <div id="voice-state-sub" class="voice-state-sub">Tap the microphone to start talking</div>
-      <div id="voice-captions" class="voice-captions" aria-live="polite"></div>
-    </div>
-
-    <div class="voice-controls">
-      <button id="voice-mute-btn" class="voice-ctl-btn" type="button" aria-label="Mute microphone" title="Mute microphone">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
-        </svg>
-      </button>
-
-      <button id="voice-talk-btn" class="voice-talk-btn" type="button" aria-label="Start voice chat">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z" />
-          <path d="M19 11a7 7 0 0 1-14 0M12 18v4" />
-        </svg>
-      </button>
-
-      <button id="voice-end-btn" class="voice-ctl-btn end" type="button" aria-label="End voice chat" title="End voice chat">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2z" />
-        </svg>
-      </button>
-    </div>
-  </section>
-
-  <!-- Settings modal -->
-  <div id="settings-modal" class="settings-modal hidden" role="dialog" aria-modal="true" aria-label="Settings">
-    <div class="settings-panel">
-      <div class="settings-header">
-        <div class="settings-title">Settings</div>
-        <button id="settings-close-btn" class="settings-close" type="button" aria-label="Close settings">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="settings-group">
-        <div class="settings-group-title">Voice</div>
-        <label class="settings-row select-row">
-          <span>Voice</span>
-          <select id="set-voice" aria-label="Voice selection"></select>
-        </label>
-        <label class="settings-row switch-row">
-          <span>Auto-speak replies</span>
-          <input type="checkbox" id="set-autospeak" aria-label="Auto-speak replies" />
-        </label>
-        <label class="settings-row range-row">
-          <span>Speech speed <output id="set-speed-out">1.0×</output></span>
-          <input type="range" id="set-speed" min="0.6" max="1.6" step="0.1"
-                 aria-label="Speech speed" />
-        </label>
-      </div>
-
-      <div class="settings-group">
-        <div class="settings-group-title">Chat</div>
-        <label class="settings-row switch-row">
-          <span>Enter to send</span>
-          <input type="checkbox" id="set-enter" aria-label="Enter to send" />
-        </label>
-        <label class="settings-row switch-row">
-          <span>Show timestamps</span>
-          <input type="checkbox" id="set-time" aria-label="Show timestamps" />
-        </label>
-        <button id="set-clear" class="settings-danger" type="button">Clear conversation</button>
-      </div>
-
-      <div class="settings-group">
-        <div class="settings-group-title">Appearance</div>
-        <label class="settings-row radio-row">
-          <span>Dark</span>
-          <input type="radio" name="theme" id="theme-dark" value="dark" aria-label="Dark theme" />
-        </label>
-        <label class="settings-row radio-row">
-          <span>Light</span>
-          <input type="radio" name="theme" id="theme-light" value="light" aria-label="Light theme" />
-        </label>
-        <label class="settings-row radio-row">
-          <span>System</span>
-          <input type="radio" name="theme" id="theme-system" value="system" aria-label="System theme" />
-        </label>
-      </div>
-    </div>
-  </div>
 
   <!-- Footer -->
   <footer class="foot">
