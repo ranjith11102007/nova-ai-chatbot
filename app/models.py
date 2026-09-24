@@ -18,6 +18,14 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage] = Field(
         ..., min_length=1, max_length=settings.MAX_HISTORY_MESSAGES
     )
+    language: str = Field(
+        "", max_length=60, description="Preferred reply language (empty = default)."
+    )
+    model: str = Field(
+        "",
+        max_length=120,
+        description="Model selector as provider@model-id (empty = server default).",
+    )
 
 
 class ChatResponse(BaseModel):

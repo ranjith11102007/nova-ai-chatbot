@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .ai_service import get_assistant_reply
-from .config import settings
+from .config import PROVIDERS, settings, provider_configured
 from .models import ChatRequest, ChatResponse
 
 logging.basicConfig(level=logging.INFO)
@@ -48,6 +48,30 @@ def health():
     }
 
 
+@app.get("/api/models")
+def list_models():
+    """List available providers/models (marks which keys are configured).
+
+    Never exposes API keys — only a boolean per provider.
+    """
+    provider_ids = list(PROVIDERS)
+    return {
+        "default": "groq@" + (settings.AI_MODEL if settings.has_model() else "qwen/qwen3.8-27b"),
+        "providers": [
+            {
+                "id": pid,
+                "label": PROVIDERS[pid]["label"],
+                "configured": provider_configured(pid),
+                "models": PROVIDERS[pid]["models"],
+                "labels": PROVIDERS[pid].get("labels", {}),
+                "key_env": PROVIDERS[pid]["key_env"],
+                "custom": PROVIDERS[pid]["custom"],
+            }
+            for pid in provider_ids
+        ],
+    }
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     """Receive the conversation, get Nova's reply, and return it."""
@@ -73,7 +97,7 @@ def chat(request: ChatRequest):
         )
 
     try:
-        reply = get_assistant_reply(messages)
+        reply = get_assistant_reply(messages, language=request.language, model=request.model)
     except RuntimeError as exc:
         logger.error("Chat request failed: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc

@@ -4,7 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nova AI</title>
-  <link rel="stylesheet" href="/static/style.css?v=2" />
+  <link rel="stylesheet" href="/static/style.css?v=7" />
+  <script>
+    // Apply the saved theme/font before paint to avoid a dark/light flash.
+    try {
+      var _s = JSON.parse(localStorage.getItem("nova_settings_v1") || "null") || {};
+      var _theme = _s.theme || "system";
+      if (_theme === "system" && window.matchMedia("(prefers-color-scheme: light)").matches) {
+        document.documentElement.dataset.theme = "light";
+      } else if (_theme !== "system") {
+        document.documentElement.dataset.theme = _theme;
+      }
+      if (_s.fontSize && _s.fontSize !== "normal") {
+        document.documentElement.dataset.font = _s.fontSize;
+      }
+    } catch (_e) {}
+  </script>
 </head>
 <body>
   <!-- Top navigation bar -->
@@ -69,13 +84,40 @@
 
     <div class="composer-wrap">
       <div class="composer" id="composer">
-        <textarea
-          id="user-input"
-          class="user-input"
-          rows="1"
-          placeholder="Type / to use slash commands"
-          maxlength="4000"
-        ></textarea>
+        <div class="composer-main">
+          <div class="model-picker" id="model-picker">
+            <button
+              id="model-picker-btn"
+              class="model-picker-btn"
+              type="button"
+              title="Choose AI model"
+              aria-haspopup="menu"
+              aria-expanded="false"
+            >
+              <svg class="model-picker-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                   stroke-linejoin="round" aria-hidden="true">
+                <rect x="5" y="5" width="14" height="14" rx="2" />
+                <path d="M12 9v6M9 12h6" />
+              </svg>
+              <span id="model-picker-label" class="model-picker-label">Default</span>
+              <svg class="model-picker-chev" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                   stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            <div id="model-menu" class="model-menu hidden" role="menu" aria-label="Choose model"></div>
+          </div>
+
+          <textarea
+            id="user-input"
+            class="user-input"
+            rows="1"
+            placeholder="Type / to use slash commands"
+            maxlength="4000"
+          ></textarea>
+        </div>
 
         <div class="composer-controls">
           <button class="plus-btn" id="plus-btn" type="button" title="Add" aria-label="Add">
@@ -127,6 +169,73 @@
     <div class="history-list" id="history-list"></div>
   </aside>
 
+  <div id="settings-backdrop" class="history-backdrop hidden"></div>
+
+  <aside id="settings-panel" class="settings-panel" aria-label="Settings">
+    <div class="settings-header">
+      <h2 class="settings-title">Settings</h2>
+      <button class="settings-close" id="settings-close-btn" type="button" title="Close" aria-label="Close settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <div class="settings-body">
+      <div class="settings-group">
+        <div class="settings-label">Theme</div>
+        <div class="seg-list" id="theme-seg" role="radiogroup" aria-label="Theme">
+          <button class="seg" data-theme-val="dark" type="button">Dark</button>
+          <button class="seg" data-theme-val="light" type="button">Light</button>
+          <button class="seg" data-theme-val="system" type="button">System</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-label">Text size</div>
+        <div class="seg-list" id="font-seg" role="radiogroup" aria-label="Text size">
+          <button class="seg" data-font-val="small" type="button">Small</button>
+          <button class="seg" data-font-val="normal" type="button">Normal</button>
+          <button class="seg" data-font-val="large" type="button">Large</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label class="settings-row" for="set-timestamps">
+          <span class="settings-row-text">
+            <span class="settings-label">Show timestamps</span>
+            <span class="settings-desc">Display the time under each message</span>
+          </span>
+          <input type="checkbox" id="set-timestamps" class="switch" />
+        </label>
+      </div>
+
+      <div class="settings-group">
+        <label class="settings-label" for="set-language">Reply language</label>
+        <select id="set-language" class="settings-select">
+          <option value="">Default</option>
+          <option>English</option>
+          <option>Tamil</option>
+          <option>Hindi</option>
+          <option>Telugu</option>
+          <option>Kannada</option>
+          <option>Malayalam</option>
+          <option>Bengali</option>
+          <option>Spanish</option>
+          <option>French</option>
+          <option>German</option>
+          <option>Arabic</option>
+          <option>Japanese</option>
+          <option>Chinese</option>
+        </select>
+      </div>
+
+      <div class="settings-group">
+        <button id="set-clear" class="settings-danger" type="button">Clear all chats</button>
+      </div>
+    </div>
+  </aside>
+
   <div id="error-bar" class="error-bar hidden"></div>
 
   <!-- Footer -->
@@ -139,6 +248,6 @@
     <a href="#" id="privacy-choice" class="privacy">Your privacy choices</a>
   </footer>
 
-  <script src="/static/script.js?v=2"></script>
+  <script src="/static/script.js?v=7"></script>
 </body>
 </html>

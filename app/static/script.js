@@ -20,8 +20,64 @@ const ACTIVE_KEY = "nova_active_id";
 const MAX_HISTORY = 50;
 const TITLE_MAX = 48;
 
+// ---- Settings (persisted in localStorage) ----
+const SETTINGS_KEY = "nova_settings_v1";
+const LANGUAGES = [
+  "",
+  "English",
+  "Tamil",
+  "Hindi",
+  "Telugu",
+  "Kannada",
+  "Malayalam",
+  "Bengali",
+  "Spanish",
+  "French",
+  "German",
+  "Arabic",
+  "Japanese",
+  "Chinese",
+];
+
+function defaultSettings() {
+  return { theme: "system", timestamps: false, language: "", fontSize: "normal", model: "" };
+}
+
+function readSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    const base = defaultSettings();
+    for (const key of Object.keys(base)) {
+      if (typeof parsed[key] !== typeof base[key]) parsed[key] = base[key];
+    }
+    return parsed;
+  } catch {
+    return defaultSettings();
+  }
+}
+
+function writeSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // storage unavailable — settings just will not persist
+  }
+}
+
+function resolveTheme() {
+  if (settings.theme !== "system") return settings.theme;
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function applySettings() {
+  document.documentElement.dataset.theme = resolveTheme();
+  document.documentElement.dataset.font = settings.fontSize;
+}
+
 let historyList = readHistory();
 let currentId = readActiveId();
+let settings = readSettings();
 
 function readHistory() {
   try {
@@ -205,6 +261,9 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && document.body.classList.contains("history-open")) {
     closeHistory();
   }
+  if (e.key === "Escape" && document.body.classList.contains("settings-open")) {
+    closeSettings();
+  }
 });
 
 // Save any in-progress conversation when the tab/page is closed.
@@ -242,9 +301,23 @@ function showMessage(content, role) {
   const div = document.createElement("div");
   div.className = `bubble ${role}`;
   div.textContent = content;
+  if (settings.timestamps) {
+    const time = document.createElement("div");
+    time.className = "msg-time";
+    time.textContent = formatTime(Date.now());
+    div.appendChild(time);
+  }
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
+}
+
+// Re-draw the current transcript (used when timestamps toggles on/off).
+function rerenderTranscript() {
+  clearTranscript();
+  messages.forEach((m) =>
+    showMessage(m.content, m.role === "assistant" ? "ai" : "user")
+  );
 }
 
 // ---- Helper: show / hide the error bar ----
@@ -354,7 +427,7 @@ async function fetchReply(history) {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: history }),
+      body: JSON.stringify({ messages: history, language: settings.language, model: settings.model }),
     });
 
     if (!response.ok) {
@@ -389,10 +462,246 @@ plusBtn.addEventListener("click", () => {
   formInput.focus();
 });
 
-["imagine-btn", "settings-btn", "signin-btn", "signup-btn"].forEach((id) => {
+["imagine-btn", "signin-btn", "signup-btn"].forEach((id) => {
   const btn = document.getElementById(id);
   if (btn) btn.addEventListener("click", () => formInput.focus());
 });
+
+// ---- Settings panel ----
+const settingsBackdrop = document.getElementById("settings-backdrop");
+
+function openSettings() {
+  settingsBackdrop.classList.remove("hidden");
+  document.body.classList.add("settings-open");
+  syncSettingsUI();
+}
+
+function closeSettings() {
+  settingsBackdrop.classList.add("hidden");
+  document.body.classList.remove("settings-open");
+}
+
+function syncSettingsUI() {
+  document
+    .querySelectorAll('#theme-seg .seg[data-theme-val]')
+    .forEach((seg) => seg.classList.toggle("active", seg.dataset.themeVal === settings.theme));
+  document
+    .querySelectorAll('#font-seg .seg[data-font-val]')
+    .forEach((seg) => seg.classList.toggle("active", seg.dataset.fontVal === settings.fontSize));
+  document.getElementById("set-timestamps").checked = !!settings.timestamps;
+  const lang = document.getElementById("set-language");
+  lang.value = LANGUAGES.includes(settings.language) ? settings.language : "";
+}
+
+// ---- Model picker (choice menu, left of the input) ----
+const modelPicker = document.getElementById("model-picker");
+const modelPickerBtn = document.getElementById("model-picker-btn");
+const modelPickerLabel = document.getElementById("model-picker-label");
+const modelMenu = document.getElementById("model-menu");
+let modelCatalog = null;
+
+async function loadModelCatalog() {
+  try {
+    const res = await fetch("/api/models");
+    if (res.ok) modelCatalog = await res.json();
+  } catch {
+    modelCatalog = null;
+  }
+  syncModelPicker();
+}
+
+function modelName(provider, modelId) {
+  try {
+    const p = modelCatalog
+      ? modelCatalog.providers.find((x) => x.id === provider)
+      : null;
+    if (p && p.labels && p.labels[modelId]) return p.labels[modelId];
+  } catch {
+    // fall through to the raw id
+  }
+  return modelId;
+}
+
+function activeModelRef() {
+  const v = (settings.model || "").trim();
+  if (!v) return { value: "", name: "Default" };
+  const at = v.indexOf("@");
+  const pid = at > 0 ? v.slice(0, at) : "groq";
+  const mid = at > 0 ? v.slice(at + 1) : v;
+  return { value: v, name: modelName(pid, mid) };
+}
+
+function buildMenuItem(value, name, subtitle, active) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "model-menu-item" + (active ? " active" : "");
+  btn.dataset.value = value;
+  btn.setAttribute("role", "menuitem");
+
+  const check = document.createElement("span");
+  check.className = "model-menu-check";
+  check.innerHTML =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+    ' stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M20 6L9 17l-5-5"/></svg>';
+
+  const nameEl = document.createElement("span");
+  nameEl.className = "model-menu-name";
+  nameEl.textContent = name;
+  btn.appendChild(check);
+  btn.appendChild(nameEl);
+
+  if (subtitle) {
+    const idEl = document.createElement("span");
+    idEl.className = "model-menu-id";
+    idEl.textContent = subtitle;
+    btn.appendChild(idEl);
+  }
+  return btn;
+}
+
+function addMenuNote(text) {
+  const note = document.createElement("div");
+  note.className = "model-menu-note";
+  note.textContent = text;
+  modelMenu.appendChild(note);
+}
+
+function addMenuTitle(text) {
+  const title = document.createElement("div");
+  title.className = "model-menu-group-title";
+  title.textContent = text;
+  modelMenu.appendChild(title);
+}
+
+function populateModelMenu() {
+  modelMenu.innerHTML = "";
+  const current = settings.model || "";
+  modelMenu.appendChild(buildMenuItem("", "Server default", null, current === ""));
+
+  if (!modelCatalog) {
+    addMenuNote("Model list unavailable right now.");
+    return;
+  }
+
+  (modelCatalog.providers || []).forEach((p) => {
+    addMenuTitle(p.label);
+    if (!p.configured) {
+      addMenuNote(`Add ${p.key_env || "the provider key"} on the server to unlock`);
+      return;
+    }
+    p.models.forEach((m) => {
+      const value = `${p.id}@${m}`;
+      modelMenu.appendChild(buildMenuItem(value, modelName(p.id, m), m, current === value));
+    });
+  });
+}
+
+function syncModelPicker() {
+  const ref = activeModelRef();
+  modelPickerLabel.textContent = ref.name;
+  modelPickerBtn.title = ref.value ? `Model: ${ref.value}` : "Use the server default model";
+}
+
+function openModelMenu() {
+  populateModelMenu();
+  modelPicker.classList.add("open");
+  modelMenu.classList.remove("hidden");
+  modelPickerBtn.setAttribute("aria-expanded", "true");
+}
+
+function closeModelMenu() {
+  modelPicker.classList.remove("open");
+  modelMenu.classList.add("hidden");
+  modelPickerBtn.setAttribute("aria-expanded", "false");
+}
+
+modelPickerBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (modelMenu.classList.contains("hidden")) openModelMenu();
+  else closeModelMenu();
+});
+
+document.addEventListener("click", (e) => {
+  if (!modelPicker.contains(e.target)) closeModelMenu();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeModelMenu();
+});
+
+modelMenu.addEventListener("click", (e) => {
+  const item = e.target.closest(".model-menu-item");
+  if (!item || item.disabled) return;
+  settings.model = item.dataset.value || "";
+  writeSettings();
+  syncModelPicker();
+  closeModelMenu();
+});
+
+document.getElementById("settings-btn").addEventListener("click", openSettings);
+document
+  .getElementById("settings-close-btn")
+  .addEventListener("click", closeSettings);
+settingsBackdrop.addEventListener("click", closeSettings);
+
+document.querySelectorAll('#theme-seg .seg[data-theme-val]').forEach((seg) => {
+  seg.addEventListener("click", () => {
+    settings.theme = seg.dataset.themeVal;
+    writeSettings();
+    applySettings();
+    syncSettingsUI();
+  });
+});
+
+document.querySelectorAll('#font-seg .seg[data-font-val]').forEach((seg) => {
+  seg.addEventListener("click", () => {
+    settings.fontSize = seg.dataset.fontVal;
+    writeSettings();
+    applySettings();
+    syncSettingsUI();
+  });
+});
+
+document.getElementById("set-timestamps").addEventListener("change", (e) => {
+  settings.timestamps = e.target.checked;
+  writeSettings();
+  rerenderTranscript();
+});
+
+document.getElementById("set-language").addEventListener("change", (e) => {
+  settings.language = e.target.value || "";
+  writeSettings();
+});
+
+document.getElementById("set-clear").addEventListener("click", () => {
+  if (!window.confirm("Delete all saved chats from this browser?")) return;
+  try {
+    localStorage.removeItem(HISTORY_KEY);
+    localStorage.removeItem(ACTIVE_KEY);
+  } catch {
+    // ignore
+  }
+  historyList = [];
+  currentId = null;
+  messages = [];
+  clearTranscript();
+  document.body.classList.remove("chatting");
+  hideError();
+  renderHistoryList();
+  closeSettings();
+  formInput.focus();
+});
+
+// Follow the OS theme when "System" is selected.
+window
+  .matchMedia("(prefers-color-scheme: light)")
+  .addEventListener("change", () => {
+    if (settings.theme === "system") applySettings();
+  });
+
+applySettings();
+loadModelCatalog();
 
 // ---- Footer links with no real destination - just stay on the page ----
 ["terms-link", "privacy-link", "privacy-choice"].forEach((id) => {
