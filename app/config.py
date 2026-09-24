@@ -14,12 +14,23 @@ class Settings:
     AI_BASE_URL: str = os.getenv("AI_BASE_URL", "").strip()
     AI_MODEL: str = os.getenv("AI_MODEL", "").strip()
 
+    # Audio / voice models (Groq Whisper + Groq Orpheus TTS).
+    AI_STT_MODEL: str = os.getenv("AI_STT_MODEL", "whisper-large-v3-turbo").strip()
+    AI_TTS_MODEL: str = os.getenv("AI_TTS_MODEL", "canopylabs/orpheus-v1-english").strip()
+
     APP_HOST: str = os.getenv("APP_HOST", "127.0.0.1").strip()
     APP_PORT: int = int(os.getenv("APP_PORT", "8000"))
 
     # Safety limits so a runaway conversation can never break the app.
     MAX_MESSAGE_LENGTH: int = 4000
     MAX_HISTORY_MESSAGES: int = 40
+
+    # Uploads / attachments.
+    MAX_IMAGES_PER_MESSAGE: int = 4
+    MAX_IMAGE_BYTES: int = 3_000_000       # decoded image payload cap (~3 MB)
+    MAX_UPLOAD_MB: int = 10                # audio + document file cap (MB)
+    MAX_DOCUMENT_CHARS: int = 12_000       # extracted document text cap
+    MAX_SPEECH_CHARS: int = 2000           # text that may be spoken in one call
 
     @property
     def openai_base_url(self) -> str:
