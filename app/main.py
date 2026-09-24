@@ -15,10 +15,21 @@ logger = logging.getLogger("nova_ai")
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
+
+class NoCacheStaticFiles(StaticFiles):
+    """Static files that always ask the browser to revalidate via ETag,
+    so freshly deployed frontend code is never masked by a stale cache."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 app = FastAPI(title="Nova AI Chatbot")
 
 # Serve style.css and script.js from the static folder.
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
