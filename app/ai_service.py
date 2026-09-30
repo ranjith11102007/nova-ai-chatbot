@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterator
 
 from openai import OpenAI
 from openai import APIError, APIConnectionError, AuthenticationError
@@ -192,3 +193,164 @@ def get_assistant_reply(messages: list[dict], language: str = "", model: str = "
         raise RuntimeError(
             "An unexpected error happened while talking to the AI service."
         ) from exc
+
+
+def stream_assistant_reply(
+    messages: list[dict], language: str = "", model: str = ""
+) -> Iterator[str]:
+    """Yield Nova's reply text chunks as the provider streams them back.
+
+    Uses the same model/provider selection and error handling as
+    get_assistant_reply(), but with stream=True so first tokens arrive fast.
+    """
+    provider_id, chosen_model = _resolve_model(model)
+    is_default = provider_id == "groq"
+
+    system_prompt = SYSTEM_PROMPT
+    if language and language.lower() not in ("default", "none"):
+        system_prompt = (
+            f"{system_prompt} Reply in {language} for every answer unless the "
+            "user writes in another language."
+        )
+
+    try:
+        client = get_client() if is_default else _get_provider_client(provider_id)
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
+
+        stream = client.chat.completions.create(
+            model=chosen_model,
+            messages=full_messages,
+            temperature=0.7,
+            stream=True,
+        )
+
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta and delta.content:
+                yield delta.content
+
+    except AuthenticationError:
+        logger.error("Invalid API key for %s.", provider_id)
+        raise RuntimeError(
+            "Authentication failed: the API key is invalid or expired. "
+            f"Check {PROVIDERS[provider_id]['key_env']} on the server."
+        ) from None
+    except RateLimitError:
+        logger.error("Rate limit hit for %s.", provider_id)
+        raise RuntimeError("Rate limit reached. Wait a moment and try again.") from None
+    except APIConnectionError:
+        logger.error("Could not reach the provider %s.", provider_id)
+        raise RuntimeError(
+            "Could not reach the AI service. Check your internet connection "
+            "and the provider base URL."
+        ) from None
+    except APIError as exc:
+        status = getattr(exc, "status_code", 0) or 0
+        reason = _provider_reason(exc)
+        logger.error("%s provider error (status %s): %s", provider_id, status, reason)
+        if status == 404:
+            message = (
+                "The selected model was not found (404). It may have been "
+                "retired — pick another model in the model bar."
+            )
+        elif status == 503:
+            message = "The model is busy right now (high demand). Try again in a moment."
+        elif status >= 500:
+            message = "The AI provider had a server error (status %s). Try again shortly." % status
+        elif status in (400, 401, 403, 422):
+            message = "The provider rejected the request (status %s). Check the model name." % status
+        else:
+            message = "The AI service returned an error (status %s). Check the provider configuration." % status
+        if reason:
+            message += " Provider says: " + reason
+        raise RuntimeError(message) from None
+    except Exception as exc:
+        logger.exception("Unexpected error while streaming a reply.")
+        raise RuntimeError(
+            "An unexpected error happened while talking to the AI service."
+        ) from exc
+
+
+def transcribe_audio(data: bytes, filename: str) -> str:
+    """Transcribe recorded audio to text with Groq Whisper."""
+    try:
+        result = get_client().audio.transcriptions.create(
+            model=settings.AI_STT_MODEL,
+            file=(filename, data, "audio/webm"),
+        )
+    except AuthenticationError:
+        logger.error("Invalid API key during transcription.")
+        raise RuntimeError(
+            "Authentication failed for speech recognition. Check AI_API_KEY on the server."
+        ) from None
+    except APIConnectionError:
+        logger.error("Could not reach Groq for transcription.")
+        raise RuntimeError(
+            "Could not reach the speech service. Check your internet connection."
+        ) from None
+    except APIError as exc:
+        logger.error("Transcription API error (status %s): %s",
+                     getattr(exc, "status_code", 0), _provider_reason(exc))
+        raise RuntimeError(
+            "I could not process that audio right now. Please try again."
+        ) from None
+    except Exception as exc:
+        logger.exception("Unexpected error during transcription.")
+        raise RuntimeError(
+            "An unexpected error happened while recognizing speech."
+        ) from exc
+
+    text = (result.text or "").strip()
+    if not text:
+        raise RuntimeError("I could not hear any speech. Please try again.")
+    return text
+
+
+# Voices supported by the configured Groq TTS model.
+VOICES = ["autumn", "diana", "hannah", "austin", "daniel", "troy"]
+
+
+def synthesize_speech(text: str, voice: str, speed: float = 1.0) -> bytes:
+    """Turn text into spoken audio bytes (wav) with Groq TTS."""
+    try:
+        response = get_client().audio.speech.create(
+            model=settings.AI_TTS_MODEL,
+            voice=voice,
+            input=text,
+            response_format="wav",
+            speed=speed,
+        )
+    except AuthenticationError:
+        logger.error("Invalid API key during speech synthesis.")
+        raise RuntimeError(
+            "Authentication failed for speech synthesis. Check AI_API_KEY on the server."
+        ) from None
+    except APIConnectionError:
+        logger.error("Could not reach Groq for speech synthesis.")
+        raise RuntimeError(
+            "Could not reach the speech service. Check your internet connection."
+        ) from None
+    except APIError as exc:
+        reason = _provider_reason(exc).lower()
+        logger.error("Speech synthesis API error (status %s): %s",
+                     getattr(exc, "status_code", 0), reason)
+        raise RuntimeError(
+            "I could not generate the audio for that voice. Please try again."
+        ) from None
+    except Exception as exc:
+        logger.exception("Unexpected error during speech synthesis.")
+        raise RuntimeError(
+            "An unexpected error happened while generating speech."
+        ) from exc
+
+    audio = response.content
+    if not audio:
+        raise RuntimeError("The speech service returned empty audio.")
+    return audio
+
+
+def list_voices() -> dict:
+    """Return the supported TTS voices for the configured model."""
+    return {"model": settings.AI_TTS_MODEL, "voices": VOICES}

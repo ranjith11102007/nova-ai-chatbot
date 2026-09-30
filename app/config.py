@@ -21,6 +21,13 @@ class Settings:
     MAX_MESSAGE_LENGTH: int = 4000
     MAX_HISTORY_MESSAGES: int = 40
 
+    # Speech-to-text model (Groq Whisper, same Groq key).
+    AI_STT_MODEL: str = os.getenv("AI_STT_MODEL", "whisper-large-v3-turbo").strip()
+
+    # Speech-to-speech model (Groq Orpheus TTS).
+    AI_TTS_MODEL: str = os.getenv("AI_TTS_MODEL", "canopylabs/orpheus-v1-english").strip()
+    MAX_SPEECH_CHARS: int = 2000  # text that may be spoken in one call
+
     @property
     def openai_base_url(self) -> str:
         # Empty means "use the official OpenAI default URL".

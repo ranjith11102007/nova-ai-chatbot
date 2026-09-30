@@ -10,18 +10,24 @@ const errorBar = document.getElementById("error-bar");
 
 const MAX_MESSAGE_LENGTH = 4000;
 
+// Namespaces storage per signed-in account (see auth.js). Guests share one store.
+const storageKey =
+  typeof window.novaStorageKey === "function"
+    ? window.novaStorageKey
+    : (base) => base;
+
 // Conversation history for the current session.
 let messages = [];
 let busy = false;
 
 // ---- Chat history (persisted in localStorage) ----
-const HISTORY_KEY = "nova_history_v1";
-const ACTIVE_KEY = "nova_active_id";
+const HISTORY_KEY = () => storageKey("nova_history_v1");
+const ACTIVE_KEY = () => storageKey("nova_active_id");
 const MAX_HISTORY = 50;
 const TITLE_MAX = 48;
 
 // ---- Settings (persisted in localStorage) ----
-const SETTINGS_KEY = "nova_settings_v1";
+const SETTINGS_KEY = () => storageKey("nova_settings_v1");
 const LANGUAGES = [
   "",
   "English",
@@ -45,7 +51,7 @@ function defaultSettings() {
 
 function readSettings() {
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
+    const raw = localStorage.getItem(SETTINGS_KEY());
     const parsed = raw ? JSON.parse(raw) : {};
     const base = defaultSettings();
     for (const key of Object.keys(base)) {
@@ -59,7 +65,7 @@ function readSettings() {
 
 function writeSettings() {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(SETTINGS_KEY(), JSON.stringify(settings));
   } catch {
     // storage unavailable — settings just will not persist
   }
@@ -81,7 +87,7 @@ let settings = readSettings();
 
 function readHistory() {
   try {
-    const raw = localStorage.getItem(HISTORY_KEY);
+    const raw = localStorage.getItem(HISTORY_KEY());
     const list = raw ? JSON.parse(raw) : [];
     return Array.isArray(list) ? list : [];
   } catch {
@@ -91,20 +97,20 @@ function readHistory() {
 
 function writeHistory() {
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(historyList));
+    localStorage.setItem(HISTORY_KEY(), JSON.stringify(historyList));
   } catch {
     // storage full or unavailable — history just will not persist
   }
 }
 
 function readActiveId() {
-  return localStorage.getItem(ACTIVE_KEY) || null;
+  return localStorage.getItem(ACTIVE_KEY()) || null;
 }
 
 function setActiveId(id) {
   try {
-    if (id) localStorage.setItem(ACTIVE_KEY, id);
-    else localStorage.removeItem(ACTIVE_KEY);
+    if (id) localStorage.setItem(ACTIVE_KEY(), id);
+    else localStorage.removeItem(ACTIVE_KEY());
   } catch {
     // ignore
   }
@@ -677,8 +683,8 @@ document.getElementById("set-language").addEventListener("change", (e) => {
 document.getElementById("set-clear").addEventListener("click", () => {
   if (!window.confirm("Delete all saved chats from this browser?")) return;
   try {
-    localStorage.removeItem(HISTORY_KEY);
-    localStorage.removeItem(ACTIVE_KEY);
+    localStorage.removeItem(HISTORY_KEY());
+    localStorage.removeItem(ACTIVE_KEY());
   } catch {
     // ignore
   }
@@ -730,3 +736,14 @@ loadModelCatalog();
   }
   renderHistoryList();
 })();
+
+// ---- Per-account data: swap history/settings when the signed-in user changes ----
+window.addEventListener("nova-auth-changed", () => {
+  historyList = readHistory();
+  currentId = readActiveId();
+  settings = readSettings();
+  applySettings();
+  syncSettingsUI();
+  renderHistoryList();
+  startNewConversation();
+});

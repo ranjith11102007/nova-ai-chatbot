@@ -4,7 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nova AI</title>
-  <link rel="stylesheet" href="/static/style.css?v=7" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#111110" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" type="image/png" href="/static/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+  <link rel="stylesheet" href="/static/style.css?v=14" />
   <script>
     // Apply the saved theme/font before paint to avoid a dark/light flash.
     try {
@@ -62,13 +68,63 @@
 
       <button class="nav-btn signin" id="signin-btn" type="button">Sign in</button>
       <button class="nav-btn signup" id="signup-btn" type="button">Sign up</button>
+
+      <div class="profile-wrap">
+        <button class="profile-chip" id="profile-chip" type="button" title=""
+                hidden aria-haspopup="menu" aria-expanded="false">
+          <span class="profile-avatar" id="profile-avatar">N</span>
+          <span class="profile-name" id="profile-name">Account</span>
+          <svg class="profile-chev" width="14" height="14" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+
+        <div id="profile-menu" class="profile-menu" role="menu" aria-label="Account menu" hidden>
+        <div class="profile-menu-head">
+          <span class="profile-menu-avatar" id="profile-menu-avatar">N</span>
+          <div class="profile-menu-meta">
+            <span class="profile-menu-name" id="profile-menu-name">Account</span>
+            <span class="profile-email" id="profile-email"></span>
+          </div>
+        </div>
+        <div class="profile-menu-row">
+          <span class="profile-provider" id="profile-provider">Account</span>
+        </div>
+
+        <div class="profile-menu-section" id="profile-recents-wrap" hidden>
+          <div class="profile-menu-title">Accounts on this device</div>
+          <div id="profile-recents" class="profile-recents"></div>
+        </div>
+
+        <button class="profile-menu-action" id="profile-add" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span>Add another account</span>
+        </button>
+        <button class="profile-menu-action" id="profile-manage" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span>Manage your Google Account</span>
+        </button>
+
+        <div class="profile-menu-divider"></div>
+        <button class="profile-signout-all" id="profile-out" type="button">Sign out of all accounts</button>
+      </div>
+      </div>
     </nav>
   </header>
 
   <!-- Main content -->
   <main class="stage">
     <section class="hero" id="hero">
-      <h1 class="hero-title">What should we explore?</h1>
+      <h1 class="hero-title" id="hero-title">What should we explore?</h1>
     </section>
 
     <!-- Conversation transcript (visible after the first message) -->
@@ -238,6 +294,79 @@
 
   <div id="error-bar" class="error-bar hidden"></div>
 
+  <!-- Sign in / Sign up modal -->
+  <div id="auth-modal" class="auth-modal" hidden role="dialog" aria-modal="true" aria-label="Sign in to Nova">
+    <div class="auth-card">
+      <button class="auth-close" id="auth-close" type="button" title="Close" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+
+      <div class="auth-brand">
+        <span class="auth-brand-logo">
+          <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M16 28c6.6 0 12-5.4 12-12S22.6 4 16 4 4 9.4 4 16s3.6 8 8 8"
+                  stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" />
+            <path d="M16 16c0-2.2 1.8-4 4-4s4 1.8 4 4"
+                  stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" />
+          </svg>
+        </span>
+        <h2 class="auth-title">Welcome to Nova</h2>
+        <p class="auth-subtitle">Sign in to keep your chats, everywhere.</p>
+      </div>
+
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" id="auth-tab-signin" type="button" role="tab">Sign in</button>
+        <button class="auth-tab" id="auth-tab-signup" type="button" role="tab">Sign up</button>
+      </div>
+
+      <button class="auth-google" id="auth-google" type="button">
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </button>
+
+      <div class="auth-divider"><span>or</span></div>
+
+      <label class="auth-field">
+        <span class="auth-label">Email</span>
+        <input id="auth-email" type="email" name="email" autocomplete="email" placeholder="you@gmail.com" />
+      </label>
+      <label class="auth-field">
+        <span class="auth-label">Password</span>
+        <input id="auth-password" type="password" name="password" autocomplete="current-password" placeholder="6+ characters" />
+      </label>
+
+      <div class="auth-status hidden" id="auth-status"></div>
+
+      <button class="auth-submit" id="auth-submit" type="button">Sign in</button>
+
+      <p class="auth-note">
+        By continuing, you agree to our
+        <a href="#" id="auth-terms-link">Terms</a> &amp;
+        <a href="#" id="auth-privacy-link">Privacy Policy</a>.
+      </p>
+
+      <div class="auth-verify hidden" id="auth-verify">
+        <svg class="auth-verify-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="M22 7l-10 6L2 7" />
+        </svg>
+        <p class="auth-verify-msg" id="auth-verify-msg"></p>
+        <button class="auth-verify-btn" id="auth-resend" type="button">I verified it -- refresh</button>
+        <button class="auth-verify-link" id="auth-resend-link" type="button" hidden>Didn't get it? Resend</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="foot">
     <p>
@@ -248,6 +377,26 @@
     <a href="#" id="privacy-choice" class="privacy">Your privacy choices</a>
   </footer>
 
-  <script src="/static/script.js?v=7"></script>
+  <a href="/voice" id="voice-fab" class="voice-fab" title="Voice chat" aria-label="Open voice chat">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+      <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+      <path d="M12 18v4" />
+    </svg>
+  </a>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/static/firebase-config.js?v=14"></script>
+  <script src="/static/auth.js?v=14"></script>
+  <script src="/static/script.js?v=14"></script>
+  <script>
+    (function () {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/static/sw.js").catch(function () {});
+      }
+    })();
+  </script>
 </body>
 </html>

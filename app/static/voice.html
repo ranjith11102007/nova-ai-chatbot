@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice chat | Nova AI</title>
+  <link rel="manifest" href="/static/manifest.json" />
+  <link rel="stylesheet" href="/static/style.css?v=12" />
+  <script>
+    // Apply the saved theme before paint (matches the main page).
+    try {
+      var _s = JSON.parse(localStorage.getItem("nova_settings_v1") || "null") || {};
+      var _theme = _s.theme || "system";
+      if (_theme === "system" && window.matchMedia("(prefers-color-scheme: light)").matches) {
+        document.documentElement.dataset.theme = "light";
+      } else if (_theme !== "system") {
+        document.documentElement.dataset.theme = _theme;
+      }
+    } catch (_e) {}
+  </script>
+  <style>
+    /* Voice page layout (adds to, never changes, the main app). */
+    body {
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .voice-topbar {
+      flex: none;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px 0 20px;
+    }
+
+    .voice-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      background: transparent;
+      border: none;
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: color var(--transition), background var(--transition);
+    }
+
+    .voice-back:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .voice-page-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .voice-pick {
+      background: var(--surface);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      max-width: 170px;
+    }
+
+    .voice-audio-btn {
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color var(--transition), border-color var(--transition);
+    }
+
+    .voice-audio-btn[aria-pressed="false"] {
+      color: var(--muted);
+      opacity: 0.6;
+    }
+
+    .voice-audio-btn[aria-pressed="true"] {
+      color: var(--blue);
+      border-color: var(--blue);
+    }
+
+    .voice-status-pill {
+      margin-left: auto;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 12px;
+      white-space: nowrap;
+    }
+
+    .voice-status-pill.error {
+      color: var(--danger);
+      border-color: rgba(255, 107, 107, 0.35);
+    }
+
+    .voice-stage {
+      flex: 1;
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 6px 24px;
+      overflow: hidden;
+    }
+
+    .voice-state-title {
+      font-size: 19px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .voice-state-sub {
+      font-size: 14px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .voice-caption {
+      min-height: 24px;
+      max-width: 100%;
+      font-size: 14px;
+      color: var(--text-dim);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .voice-caption-final {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .voice-talk-btn {
+      width: 96px;
+      height: 96px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #4f8bff, #377bf1);
+      color: #ffffff;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 10px 34px rgba(55, 123, 241, 0.4);
+      margin: 14px 0 4px;
+      transition: transform var(--transition), box-shadow var(--transition),
+        background var(--transition);
+    }
+
+    .voice-talk-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 40px rgba(55, 123, 241, 0.5);
+    }
+
+    .voice-talk-btn.active {
+      background: linear-gradient(135deg, #ff6b6b, #d9484f);
+      box-shadow: 0 10px 34px rgba(255, 107, 107, 0.45);
+      animation: voice-rec-pulse 1.2s ease-in-out infinite;
+    }
+
+    .voice-talk-btn.speaking {
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+      box-shadow: 0 10px 34px rgba(46, 204, 113, 0.45);
+    }
+
+    .voice-talk-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    @keyframes voice-rec-pulse {
+      0%, 100% { box-shadow: 0 0 22px rgba(255, 107, 107, 0.35); }
+      50% { box-shadow: 0 0 44px rgba(255, 107, 107, 0.6); }
+    }
+
+    .voice-log {
+      flex: 0 1 auto;
+      width: 100%;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 6px 2px;
+    }
+
+    .vbubble {
+      max-width: 82%;
+      padding: 10px 14px;
+      font-size: 14.5px;
+      line-height: 1.5;
+      border-radius: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .vbubble.user {
+      align-self: flex-end;
+      background: var(--blue);
+      color: #ffffff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .vbubble.ai {
+      align-self: flex-start;
+      background: var(--surface);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+
+    .voice-hint {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 640px) {
+      .voice-topbar {
+        padding: 0 10px;
+        gap: 6px;
+      }
+
+      .voice-back span {
+        display: none;
+      }
+
+      .voice-pick {
+        max-width: 130px;
+      }
+
+      .voice-talk-btn {
+        width: 84px;
+        height: 84px;
+      }
+
+      .voice-state-title {
+        font-size: 17px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="voice-topbar">
+    <a href="/" class="voice-back" aria-label="Back to chat">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 12H5M12 19l-7-7 7-7" />
+      </svg>
+      <span>Back to chat</span>
+    </a>
+    <div class="voice-page-title">Voice</div>
+    <select id="voice-pick" class="voice-pick" aria-label="Nova's voice" title="Nova's voice"></select>
+    <button id="voice-audio-btn" class="voice-audio-btn" type="button" aria-pressed="true" title="Toggle spoken replies">Read aloud: On</button>
+    <div id="voice-status-pill" class="voice-status-pill" role="status" hidden>Ready</div>
+  </header>
+
+  <main class="voice-stage">
+    <div id="voice-state-title" class="voice-state-title">Tap the microphone and speak</div>
+    <div id="voice-state-sub" class="voice-state-sub">Nova hears you, answers, then listens again — hands-free</div>
+
+    <button id="voice-talk-btn" class="voice-talk-btn" type="button" aria-label="Tap and speak">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+        <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+        <path d="M12 18v4" />
+      </svg>
+    </button>
+
+    <div id="voice-caption" class="voice-caption">—</div>
+    <div id="voice-log" class="voice-log" aria-live="polite"></div>
+    <div class="voice-hint">Tap the mic anytime to interrupt Nova and speak</div>
+  </main>
+
+  <script>
+    // ---- Shared settings (same storage the main app uses) ----
+    var MAX_HISTORY = 50;
+    var TITLE_MAX = 48;
+    var MAX_SPEECH_CHARS = 2000;
+    // Same account as the main page: sign in there, then voice follows it here.
+    var savedUser = null;
+    try { savedUser = JSON.parse(localStorage.getItem("nova_user_v1") || "null"); } catch (e) {}
+    if (savedUser && savedUser.verified && savedUser.uid) {
+      window.novaUser = savedUser;
+      window.novaStorageKey = function (b) { return b + "_u_" + savedUser.uid; };
+    }
+    var storageKey = typeof window.novaStorageKey === "function" ? window.novaStorageKey : function (b) { return b; };
+    function historyKey() { return storageKey("nova_history_v1"); }
+    function activeKey() { return storageKey("nova_active_id"); }
+    function voiceKey() { return storageKey("nova_voice_v1"); }
+    function voiceOutKey() { return storageKey("nova_voice_out_v1"); }
+
+    function readSettings() {
+      try {
+        var parsed = JSON.parse(localStorage.getItem(storageKey("nova_settings_v1")) || "null") || {};
+        return { language: typeof parsed.language === "string" ? parsed.language : "", model: typeof parsed.model === "string" ? parsed.model : "" };
+      } catch (e) {
+        return { language: "", model: "" };
+      }
+    }
+    var voiceSettings = readSettings();
+
+    function readHistory() {
+      try {
+        var list = JSON.parse(localStorage.getItem(historyKey()) || "[]");
+        return Array.isArray(list) ? list : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function readActiveId() {
+      try {
+        return localStorage.getItem(activeKey()) || null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function setActiveId(id) {
+      try {
+        if (id) localStorage.setItem(activeKey(), id);
+        else localStorage.removeItem(activeKey());
+      } catch (e) {}
+    }
+
+    function convTitle() {
+      var first = null;
+      for (var i = 0; i < voiceMessages.length; i += 1) {
+        if (voiceMessages[i].role === "user") { first = voiceMessages[i]; break; }
+      }
+      var text = (first && first.content) || "Voice chat";
+      return text.length > TITLE_MAX ? text.slice(0, TITLE_MAX - 1) + "\u2026" : text;
+    }
+
+    function saveConversation() {
+      var list = readHistory();
+      if (currentId) list = list.filter(function (c) { return c.id !== currentId; });
+      list.unshift({
+        id: currentId,
+        title: convTitle(),
+        updated: Date.now(),
+        messages: voiceMessages.slice(),
+      });
+      list.sort(function (a, b) { return b.updated - a.updated; });
+      if (list.length > MAX_HISTORY) list.length = MAX_HISTORY;
+      try {
+        localStorage.setItem(historyKey(), JSON.stringify(list));
+        setActiveId(currentId);
+      } catch (e) {}
+    }
+
+    // Continue the active conversation if one exists.
+    var voiceMessages = [];
+    var currentId = readActiveId();
+    if (currentId) {
+      var convs = readHistory();
+      for (var ci = 0; ci < convs.length; ci += 1) {
+        if (convs[ci].id === currentId && Array.isArray(convs[ci].messages)) {
+          voiceMessages = convs[ci].messages.map(function (m) {
+            return { role: m.role, content: m.content };
+          });
+          break;
+        }
+      }
+    }
+
+    // ---- Elements ----
+    var elStatus = document.getElementById("voice-status-pill");
+    var elTitle = document.getElementById("voice-state-title");
+    var elSub = document.getElementById("voice-state-sub");
+    var elCaption = document.getElementById("voice-caption");
+    var elTalk = document.getElementById("voice-talk-btn");
+    var elLog = document.getElementById("voice-log");
+    var elPick = document.getElementById("voice-pick");
+    var elAudioBtn = document.getElementById("voice-audio-btn");
+    var MAX_MESSAGE_LENGTH = 4000;
+
+    var readAloud = localStorage.getItem(voiceOutKey()) !== "0";
+    var chosenVoice = localStorage.getItem(voiceKey()) || "autumn";
+    var voiceList = [];
+
+    // ---- State ----
+    var rec = { stream: null, recorder: null, chunks: [], analyser: null, ctx: null, timer: null, silentMs: 0, recording: false };
+    var busy = false;
+    var streamAbort = null;
+    var audioEl = null;
+    var fallbackUtterance = null;
+
+    // ---- Input engine: live Web Speech API when possible, Whisper fallback ----
+    var SR = null;
+    try { SR = window.SpeechRecognition || window.webkitSpeechRecognition; } catch (e) {}
+    var liveAvailable = !!SR;
+    var mode = liveAvailable ? "live" : "whisper";
+    var live = { recognition: null, active: false, haveSpeech: false };
+
+    // ---- Chunked sentence TTS pipeline (Nova talks sentence by sentence) ----
+    var SPEECH_PIECE_MAX = 200;
+    var tts = { queue: [], playing: false, spoken: 0, convoDone: false, capped: false };
+    var ttsBuf = "";
+    var ttsParsed = 0;
+    var chimeCtx = null;
+
+    function supported() {
+      return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && typeof MediaRecorder !== "undefined");
+    }
+
+    function setStatus(text, isError) {
+      elStatus.hidden = !text;
+      if (text) {
+        elStatus.textContent = text;
+        elStatus.className = "voice-status-pill" + (isError ? " error" : "");
+      }
+    }
+
+    function setTalkDisabled(disabled) {
+      elTalk.disabled = disabled;
+    }
+
+    function removeTalkState() {
+      elTalk.classList.remove("active");
+      elTalk.classList.remove("speaking");
+    }
+
+    function idle(sub) {
+      removeTalkState();
+      setTalkDisabled(false);
+      elTitle.textContent = "Tap the microphone and speak";
+      elSub.textContent = sub || (mode === "live"
+        ? "Tap to talk \u2014 live recognition, then Nova listens again"
+        : "Nova hears you, answers, then listens again \u2014 hands-free");
+      elCaption.textContent = "\u2014";
+      elCaption.classList.remove("voice-caption-final");
+      setStatus(null);
+    }
+
+    function addBubble(text, who) {
+      var div = document.createElement("div");
+      div.className = "vbubble " + who;
+      div.textContent = text;
+      elLog.appendChild(div);
+      elLog.scrollTop = elLog.scrollHeight;
+    }
+
+    // ---- Voice picker (Groq TTS voices) ----
+    function loadVoices() {
+      fetch("/api/voices")
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          voiceList = (data && Array.isArray(data.voices)) ? data.voices : [];
+          if (voiceList.length === 0) return;
+          var current = voiceList.indexOf(chosenVoice) >= 0 ? chosenVoice : voiceList[0];
+          var opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "Auto voice";
+          elPick.appendChild(opt);
+          voiceList.forEach(function (v) {
+            var o = document.createElement("option");
+            o.value = v;
+            o.textContent = v.replace(/^./, function (c) { return c.toUpperCase(); });
+            elPick.appendChild(o);
+          });
+          elPick.value = current;
+          chosenVoice = current;
+          localStorage.setItem(voiceKey(), chosenVoice);
+        })
+        .catch(function () {});
+    }
+
+    // ---- Reply out loud (Groq voice, browser fallback) ----
+    var LANG_MAP = {
+      English: "en", Tamil: "ta", Hindi: "hi", Telugu: "te", Kannada: "kn",
+      Malayalam: "ml", Bengali: "bn", Spanish: "es", French: "fr", German: "de",
+      Arabic: "ar", Japanese: "ja", Chinese: "zh",
+    };
+
+    function browserVoices() {
+      if (!("speechSynthesis" in window)) return [];
+      return window.speechSynthesis.getVoices();
+    }
+
+    function pickBrowserVoice() {
+      var lang = LANG_MAP[voiceSettings.language] || "en";
+      var voices = browserVoices();
+      if (voices.length === 0) return null;
+      var pref = voices.filter(function (v) { return v.lang && v.lang.toLowerCase().indexOf(lang) === 0; });
+      return (pref && pref[0]) || voices.filter(function (v) { return v.lang && v.lang.indexOf("en") === 0; })[0] || voices[0];
+    }
+
+    function resetTts() {
+      tts.queue.length = 0;
+      tts.playing = false;
+      tts.spoken = 0;
+      tts.convoDone = false;
+      tts.capped = false;
+      ttsBuf = "";
+      ttsParsed = 0;
+    }
+
+    function abortStream() {
+      if (streamAbort) {
+        try { streamAbort.abort(); } catch (e) {}
+        streamAbort = null;
+      }
+    }
+
+    function cancelSpeech() {
+      resetTts();
+      if (audioEl) {
+        audioEl.pause();
+        audioEl.src = "";
+        audioEl = null;
+      }
+      if (fallbackUtterance) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+        fallbackUtterance = null;
+      }
+    }
+
+    function onSpokenDone() {
+      setTalkDisabled(false);
+      if (document.visibilityState !== "hidden") autoRelisten();
+    }
+
+    function autoRelisten() {
+      if (rec.recording || live.active || busy) return;
+      setTimeout(function () { startListening(true); }, 450);
+    }
+
+    // ---- Sentence chunked speech: Nova talks while the reply is still flowing ----
+    function sentenceChunks(text) {
+      var out = [];
+      var buf = "";
+      for (var i = 0; i < text.length; i += 1) {
+        var ch = text[i];
+        buf += ch;
+        if (buf.length >= SPEECH_PIECE_MAX || ch === "." || ch === "!" || ch === "?" || ch === "\n") {
+          var t = buf.trim();
+          if (t) out.push(t);
+          buf = "";
+        }
+      }
+      var rest = buf.trim();
+      if (rest) out.push(rest);
+      return out;
+    }
+
+    function ttsQueuePush(piece) {
+      tts.queue.push(piece);
+      ttsPoll();
+    }
+
+    function ttsPoll() {
+      if (tts.playing) return;
+      if (tts.queue.length === 0) {
+        if (tts.convoDone) onSpokenDone();
+        return;
+      }
+      var text = tts.queue.shift();
+      tts.playing = true;
+      playGroqVoice(text).then(function (ok) {
+        if (ok) {
+          tts.playing = false;
+          ttsPoll();
+        } else {
+          playBrowserVoice(text, function () {
+            tts.playing = false;
+            ttsPoll();
+          }, function () {
+            tts.playing = false;
+            ttsPoll();
+          });
+        }
+      });
+    }
+
+    function feedSpeech(fullText) {
+      if (!readAloud) return;
+      if (fullText.length <= ttsParsed) return;
+      ttsBuf += fullText.slice(ttsParsed);
+      ttsParsed = fullText.length;
+      var chunks = sentenceChunks(ttsBuf);
+      var tail = chunks.pop() || "";
+      for (var i = 0; i < chunks.length; i += 1) {
+        if (tts.capped) break;
+        if (tts.spoken + chunks[i].length > MAX_SPEECH_CHARS) { tts.capped = true; break; }
+        tts.spoken += chunks[i].length;
+        ttsQueuePush(chunks[i]);
+      }
+      ttsBuf = tail;
+    }
+
+    function flushSpeech() {
+      if (!readAloud) return;
+      var tail = ttsBuf.trim();
+      ttsBuf = "";
+      if (!tail) return;
+      var room = MAX_SPEECH_CHARS - tts.spoken;
+      if (room <= 0) { tts.capped = true; return; }
+      if (tail.length > room) { tail = tail.slice(0, room); tts.capped = true; }
+      if (!tail.trim()) return;
+      tts.spoken += tail.length;
+      ttsQueuePush(tail);
+    }
+
+    function beginSpeaking() {
+      if (!readAloud) return;
+      elTalk.classList.add("speaking");
+      elTitle.textContent = "Nova is speaking\u2026";
+      elSub.textContent = "Tap the mic to interrupt";
+      setStatus(null);
+      setTalkDisabled(false);
+    }
+
+    function finishSpokenTurn() {
+      tts.convoDone = true;
+      flushSpeech();
+      if (!tts.playing && tts.queue.length === 0) onSpokenDone();
+    }
+
+    function audioAvailable() {
+      return typeof Audio !== "undefined";
+    }
+
+    function chime() {
+      try {
+        if (!chimeCtx) chimeCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (chimeCtx.state === "suspended") chimeCtx.resume();
+        var t = chimeCtx.currentTime;
+        var osc = chimeCtx.createOscillator();
+        var g = chimeCtx.createGain();
+        osc.connect(g);
+        g.connect(chimeCtx.destination);
+        osc.frequency.setValueAtTime(880, t);
+        osc.frequency.setValueAtTime(740, t + 0.08);
+        g.gain.setValueAtTime(0.1, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+        osc.start(t);
+        osc.stop(t + 0.22);
+      } catch (e) {}
+    }
+
+    function playGroqVoice(text) {
+      return fetch("/api/speech", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text, voice: chosenVoice || "autumn", speed: 1.0 }),
+      })
+        .then(function (res) {
+          if (!res.ok) return false;
+          return res.blob();
+        })
+        .then(function (blob) {
+          if (!blob || blob.size === 0) return false;
+          return new Promise(function (resolve) {
+            var url = URL.createObjectURL(blob);
+            if (audioEl) audioEl.pause();
+            audioEl = new Audio(url);
+            audioEl.onended = function () {
+              URL.revokeObjectURL(url);
+              audioEl = null;
+              resolve(true);
+            };
+            audioEl.onerror = function () {
+              URL.revokeObjectURL(url);
+              audioEl = null;
+              resolve(false);
+            };
+            audioEl.onplay = function () { setStatus("Speaking\u2026"); };
+            audioEl.play().catch(function () {
+              URL.revokeObjectURL(url);
+              resolve(false);
+            });
+          });
+        })
+        .catch(function () { return false; });
+    }
+
+    function playBrowserVoice(text, onend, onerror) {
+      if (!("speechSynthesis" in window)) { if (onend) onend(); return; }
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+      var u = new SpeechSynthesisUtterance(text);
+      var v = pickBrowserVoice();
+      if (v) u.voice = v;
+      u.lang = v ? v.lang : (LANG_MAP[voiceSettings.language] || "en-US");
+      u.rate = 1.0;
+      u.onend = function () { fallbackUtterance = null; if (onend) onend(); };
+      u.onerror = function () { fallbackUtterance = null; if (onerror) onerror(); };
+      fallbackUtterance = u;
+      window.speechSynthesis.speak(u);
+    }
+
+    // ---- Recording ----
+    function startListening(auto) {
+      if (busy) { setStatus("Nova is still replying \u2014 wait a second.", true); return; }
+      if (mode === "live") { startLive(auto); return; }
+      cancelSpeech();
+      abortStream();
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then(function (stream) {
+          if (rec.recording || busy) {
+            stream.getTracks().forEach(function (t) { t.stop(); });
+            return;
+          }
+          rec.stream = stream;
+          var mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+          var recorder = new MediaRecorder(stream, { mimeType: mime });
+          rec.recorder = recorder;
+          rec.chunks = [];
+
+          recorder.ondataavailable = function (e) {
+            if (e.data && e.data.size > 0) rec.chunks.push(e.data);
+          };
+          recorder.onstop = function () {
+            var blob = new Blob(rec.chunks, { type: mime });
+            rec.chunks = [];
+            finishClip(blob);
+          };
+
+          rec.ctx = new (window.AudioContext || window.webkitAudioContext)();
+          var source = rec.ctx.createMediaStreamSource(stream);
+          var analyser = rec.ctx.createAnalyser();
+          analyser.fftSize = 1024;
+          source.connect(analyser);
+          rec.analyser = analyser;
+          rec.silentMs = 0;
+
+          recorder.start();
+          rec.recording = true;
+
+          elTalk.classList.add("active");
+          elTitle.textContent = "Listening\u2026 speak now";
+          elSub.textContent = "I will stop after a short pause";
+          elCaption.textContent = "";
+          setStatus(null);
+          if (!auto) chime();
+
+          var level = new Uint8Array(analyser.frequencyBinCount);
+          rec.timer = setInterval(function () {
+            analyser.getByteFrequencyData(level);
+            var sum = 0;
+            for (var i = 0; i < level.length; i += 1) sum += level[i];
+            if (sum / level.length < 6) rec.silentMs += 250;
+            else rec.silentMs = 0;
+            if (rec.silentMs >= 800 && rec.recording) stopRecording();
+          }, 250);
+        })
+        .catch(function () {
+          if (!auto) {
+            idle("Check your microphone permission and try again.");
+            setStatus("Microphone denied?", true);
+          }
+        });
+    }
+
+    function stopRecording() {
+      if (rec.timer) { clearInterval(rec.timer); rec.timer = null; }
+      rec.recording = false;
+      var recorder = rec.recorder;
+      rec.recorder = null;
+      if (recorder && recorder.state !== "inactive") {
+        try { recorder.stop(); } catch (e) {}
+      }
+      if (rec.stream) {
+        rec.stream.getTracks().forEach(function (t) { t.stop(); });
+        rec.stream = null;
+      }
+      if (rec.ctx) {
+        try { rec.ctx.close(); } catch (e) {}
+        rec.ctx = null;
+      }
+      rec.analyser = null;
+      elTalk.classList.remove("active");
+      elTitle.textContent = "Thinking\u2026";
+      elSub.textContent = "Turning your words into text";
+      setTalkDisabled(true);
+    }
+
+    function finishClip(blob) {
+      if (!blob || blob.size === 0) { idle("I didn't catch that. Tap the mic and try again."); return; }
+      setTalkDisabled(true);
+      setStatus(null);
+      elTitle.textContent = "Hearing you\u2026";
+      elSub.textContent = "";
+      setStatus("Transcribing\u2026");
+
+      var form = new FormData();
+      var ext = blob.type.indexOf("ogg") >= 0 ? "ogg" : "webm";
+      form.append("file", blob, "recording." + ext);
+
+      fetch("/api/transcribe", { method: "POST", body: form })
+        .then(function (res) {
+          if (!res.ok) return res.json().then(function (data) {
+            throw new Error((data && data.detail) || "Try again.");
+          });
+          return res.json();
+        })
+        .then(function (data) {
+          var text = (data.text || "").trim();
+          if (!text) { idle("I couldn't hear any speech. Try again."); return; }
+          if (text.length > MAX_MESSAGE_LENGTH) text = text.slice(0, MAX_MESSAGE_LENGTH);
+          elCaption.textContent = text;
+          submitSpoken(text);
+        })
+        .catch(function (err) {
+          idle();
+          setStatus("Couldn't hear you \u2014 " + err.message, true);
+        });
+    }
+
+    // ---- Live recognition (Web Speech API) with Whisper fallback ----
+    var LANG_REC = {
+      English: "en-US", Tamil: "ta-IN", Hindi: "hi-IN", Telugu: "te-IN", Kannada: "kn-IN",
+      Malayalam: "ml-IN", Bengali: "bn-IN", Spanish: "es-ES", French: "fr-FR", German: "de-DE",
+      Arabic: "ar-SA", Japanese: "ja-JP", Chinese: "zh-CN",
+    };
+
+    function makeLiveRecognition() {
+      var recog = new SR();
+      recog.continuous = false;
+      recog.interimResults = true;
+      recog.maxAlternatives = 1;
+
+      // Force a fast final answer the moment the user pauses speaking, instead
+      // of waiting (sometimes for minutes) for the browser's silence detector.
+      var quietTimer = null;
+      function clearQuiet() {
+        if (quietTimer) { clearTimeout(quietTimer); quietTimer = null; }
+      }
+      function armQuiet() {
+        clearQuiet();
+        var ms = live.haveSpeech ? 600 : 4000;
+        quietTimer = setTimeout(function () {
+          quietTimer = null;
+          if (live.active && live.recognition) {
+            try { live.recognition.stop(); } catch (e) {}
+          }
+        }, ms);
+      }
+
+      recog.onstart = function () {
+        live.active = true;
+        setStatus(null);
+        armQuiet();
+      };
+
+      recog.onresult = function (event) {
+        var interim = "";
+        var finalText = "";
+        for (var i = event.resultIndex; i < event.results.length; i += 1) {
+          var res = event.results[i];
+          if (res.isFinal) finalText += res[0].transcript;
+          else interim += res[0].transcript;
+        }
+        if (interim) {
+          live.haveSpeech = true;
+          elCaption.textContent = interim;
+          elTitle.textContent = "Listening\u2026";
+          armQuiet();
+        }
+        if (finalText) {
+          clearQuiet();
+          elCaption.classList.add("voice-caption-final");
+          elCaption.textContent = finalText;
+          stopLive();
+          submitSpoken(finalText.trim());
+        }
+      };
+
+      recog.onspeechend = function () {
+        armQuiet();
+      };
+
+      recog.onerror = function (event) {
+        clearQuiet();
+        live.active = false;
+        if (live.recognition === recog) live.recognition = null;
+        elTalk.classList.remove("active");
+        elCaption.classList.remove("voice-caption-final");
+        elCaption.textContent = "";
+        var err = event.error || "";
+        if (err === "not-allowed" || err === "service-not-allowed") {
+          switchToWhisper("Microphone is blocked \u2014 switched to tap-to-talk.");
+        } else if (err === "network") {
+          switchToWhisper("Live voice needs the network \u2014 switched to tap-to-talk.");
+        } else if (err === "no-speech") {
+          idle("I didn't hear anything. Tap the mic and try again.");
+        } else if (err === "aborted") {
+          idle();
+        } else {
+          switchToWhisper("Live listening failed \u2014 switched to tap-to-talk.");
+        }
+      };
+
+      recog.onend = function () {
+        clearQuiet();
+        var wasActive = live.active;
+        live.active = false;
+        if (live.recognition === recog) live.recognition = null;
+        elTalk.classList.remove("active");
+        if (wasActive && !busy && !rec.recording) autoRelisten();
+      };
+
+      return recog;
+    }
+
+    function startLive(auto) {
+      try {
+        if (live.active) { stopLiveQuiet(); return; }
+        cancelSpeech();
+        abortStream();
+        var recog = makeLiveRecognition();
+        live.recognition = recog;
+        live.haveSpeech = false;
+        recog.lang = LANG_REC[voiceSettings.language] || "en-US";
+        recog.start();
+        live.active = true;
+        elTalk.classList.add("active");
+        elTitle.textContent = "Listening\u2026 speak now";
+        elSub.textContent = "Live recognition \u2014 tap the mic to stop";
+        elCaption.textContent = "";
+        elCaption.classList.remove("voice-caption-final");
+        setStatus(null);
+        if (!auto) chime();
+      } catch (e) {
+        live.active = false;
+        live.recognition = null;
+        switchToWhisper("Couldn't start live listening \u2014 using tap-to-talk.");
+      }
+    }
+
+    function stopLive() {
+      live.active = false;
+      if (live.recognition) {
+        try { live.recognition.stop(); } catch (e) {}
+      }
+      elTalk.classList.remove("active");
+      elTitle.textContent = "Thinking\u2026";
+      elSub.textContent = "Turning your words into text";
+      setTalkDisabled(true);
+    }
+
+    function stopLiveQuiet() {
+      live.active = false;
+      if (live.recognition) {
+        try { live.recognition.stop(); } catch (e) {}
+      }
+      idle();
+    }
+
+    function switchToWhisper(message) {
+      live.active = false;
+      if (live.recognition) {
+        try { live.recognition.onerror = null; live.recognition.onend = null; live.recognition.abort(); } catch (e) {}
+        live.recognition = null;
+      }
+      mode = "whisper";
+      elTalk.classList.remove("active");
+      elCaption.classList.remove("voice-caption-final");
+      idle();
+      if (message) setStatus(message, true);
+    }
+
+    // ---- Send the spoken words to Nova (streams her reply, then speaks it) ----
+    function submitSpoken(text) {
+      if (busy) return;
+      var full = voiceMessages.slice();
+      full.push({ role: "user", content: text });
+
+      addBubble(text, "user");
+      elTitle.textContent = "Asking Nova\u2026";
+      elSub.textContent = "";
+      setTalkDisabled(true);
+      busy = true;
+
+      var safeMsgs = full.slice(-40).map(function (m) {
+        var c = (m.content || "").slice(0, MAX_MESSAGE_LENGTH);
+        var r = m.role;
+        if (r !== "user" && r !== "assistant" && r !== "system") return null;
+        return c ? { role: r, content: c } : null;
+      }).filter(Boolean);
+
+      var aiBubble = document.createElement("div");
+      aiBubble.className = "vbubble ai";
+      aiBubble.textContent = "";
+      elLog.appendChild(aiBubble);
+      elLog.scrollTop = elLog.scrollHeight;
+
+      var reply = "";
+      var startedSpeaking = false;
+      streamAbort = new AbortController();
+
+      function finishReply(finalText) {
+        streamAbort = null;
+        busy = false;
+        elTalk.classList.remove("speaking");
+        finalText = (finalText || "").trim();
+        if (!finalText) {
+          finalText = "I could not think of a reply just now.";
+          aiBubble.textContent = finalText;
+        }
+        voiceMessages = full.slice();
+        voiceMessages.push({ role: "assistant", content: finalText });
+        if (!currentId) currentId = "c_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        saveConversation();
+        elCaption.textContent = "";
+        if (readAloud) finishSpokenTurn();
+        else onSpokenDone();
+      }
+
+      fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: safeMsgs,
+          language: voiceSettings.language,
+          model: voiceSettings.model,
+        }),
+        signal: streamAbort.signal,
+      })
+        .then(function (res) {
+          if (!res.ok) return res.json().then(function (data) {
+            throw new Error((data && data.detail) || "Something went wrong. Try again.");
+          });
+          var reader = res.body.getReader();
+          var decoder = new TextDecoder();
+          var buf = "";
+          function pump() {
+            return reader.read().then(function (r) {
+              if (r.done) return;
+              buf += decoder.decode(r.value, { stream: true });
+              var parts = buf.split("\n\n");
+              buf = parts.pop();
+              var streamError = null;
+              for (var i = 0; i < parts.length; i += 1) {
+                var block = parts[i].split("\n");
+                for (var j = 0; j < block.length; j += 1) {
+                  var line = block[j].trim();
+                  if (line.indexOf("data:") !== 0) continue;
+                  var dataText = line.slice(5).trim();
+                  if (!dataText || dataText === "[DONE]") continue;
+                  var obj;
+                  try { obj = JSON.parse(dataText); } catch (e) { continue; }
+                  if (obj.error) { streamError = obj.error; break; }
+                  if (obj.token) {
+                    reply += obj.token;
+                    aiBubble.textContent = reply;
+                    elLog.scrollTop = elLog.scrollHeight;
+                    if (!startedSpeaking) { startedSpeaking = true; beginSpeaking(); }
+                    feedSpeech(reply);
+                  }
+                }
+                if (streamError) break;
+              }
+              if (streamError) throw new Error(streamError);
+              return pump();
+            });
+          }
+          return pump();
+        })
+        .then(function () {
+          finishReply(reply);
+        })
+        .catch(function (err) {
+          streamAbort = null;
+          busy = false;
+          var aborted = !!(err && err.name === "AbortError");
+          if (aiBubble.parentNode) {
+            if (!reply) aiBubble.parentNode.removeChild(aiBubble);
+            else if (aborted) aiBubble.textContent = reply + "\u2026";
+          }
+          if (aborted) {
+            cancelSpeech();
+            idle();
+            return;
+          }
+          resetTts();
+          elCaption.textContent = "";
+          idle("Try again whenever you're ready.");
+          setStatus(err.message, true);
+        });
+    }
+
+    // ---- Toggle controls ----
+    function syncAudioBtn() {
+      elAudioBtn.setAttribute("aria-pressed", readAloud ? "true" : "false");
+      elAudioBtn.textContent = "Read aloud: " + (readAloud ? "On" : "Off");
+    }
+
+    // ---- Wire up ----
+    if (!supported() && !liveAvailable) {
+      elTalk.disabled = true;
+      elTitle.textContent = "Voice chat isn't supported in this browser";
+      elSub.textContent = "Use Chrome or Edge on desktop or mobile.";
+    } else {
+      syncAudioBtn();
+      loadVoices();
+
+      elTalk.addEventListener("click", function () {
+        if (busy) {
+          abortStream();
+          cancelSpeech();
+          busy = false;
+        }
+        if (mode === "live") {
+          if (live.active) stopLiveQuiet();
+          else startListening(false);
+        } else if (rec.recording) {
+          stopRecording();
+        } else {
+          startListening(false);
+        }
+      });
+
+      elPick.addEventListener("change", function () {
+        chosenVoice = elPick.value || voiceList[0] || "autumn";
+        if (chosenVoice) localStorage.setItem(voiceKey(), chosenVoice);
+      });
+
+      elAudioBtn.addEventListener("click", function () {
+        readAloud = !readAloud;
+        localStorage.setItem(voiceOutKey(), readAloud ? "1" : "0");
+        syncAudioBtn();
+        if (!readAloud) cancelSpeech();
+      });
+
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "hidden") {
+          abortStream();
+          cancelSpeech();
+          stopInput();
+        }
+      });
+
+      window.addEventListener("pagehide", function () {
+        abortStream();
+        cancelSpeech();
+        stopInput();
+      });
+    }
+  </script>
+  <script>
+    (function () {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/static/sw.js").catch(function () {});
+      }
+    })();
+  </script>
+</body>
+</html>
