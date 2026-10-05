@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="icon" type="image/png" href="/static/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
-  <link rel="stylesheet" href="/static/style.css?v=14" />
+  <link rel="stylesheet" href="/static/style.css?v=17" />
   <script>
     // Apply the saved theme/font before paint to avoid a dark/light flash.
     try {
@@ -40,7 +40,8 @@
     </button>
 
     <nav class="nav">
-      <button class="nav-btn" id="imagine-btn" type="button" title="Imagine">
+      <button class="nav-btn" id="imagine-btn" type="button" title="Generate an image"
+              aria-label="Generate an image with Nova">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -139,6 +140,7 @@
     </section>
 
     <div class="composer-wrap">
+      <div class="attach-tray" id="attach-tray" hidden></div>
       <div class="composer" id="composer">
         <div class="composer-main">
           <div class="model-picker" id="model-picker">
@@ -176,12 +178,62 @@
         </div>
 
         <div class="composer-controls">
-          <button class="plus-btn" id="plus-btn" type="button" title="Add" aria-label="Add">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
+          <div class="plus-wrap" id="plus-wrap">
+            <button class="plus-btn" id="plus-btn" type="button" title="Add photos, files or generate an image"
+                    aria-label="Add" aria-haspopup="menu" aria-expanded="false">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+
+            <div id="attach-menu" class="attach-menu hidden" role="menu" aria-label="Add to chat">
+              <button class="attach-item" id="attach-photo" type="button" role="menuitem">
+                <span class="attach-item-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="3" />
+                    <circle cx="9" cy="9" r="2" />
+                    <path d="M21 15l-5-5L5 21" />
+                  </svg>
+                </span>
+                <span class="attach-item-text">
+                  <b>Photo or image</b>
+                  <i>Let Nova look at a picture you upload</i>
+                </span>
+              </button>
+
+              <button class="attach-item" id="attach-doc" type="button" role="menuitem">
+                <span class="attach-item-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <path d="M14 2v6h6M9 13h6M9 17h6" />
+                  </svg>
+                </span>
+                <span class="attach-item-text">
+                  <b>Document</b>
+                  <i>PDF, text, markdown, code or CSV</i>
+                </span>
+              </button>
+
+              <div class="attach-menu-divider"></div>
+
+              <button class="attach-item" id="attach-generate" type="button" role="menuitem">
+                <span class="attach-item-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+                    <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" />
+                  </svg>
+                </span>
+                <span class="attach-item-text">
+                  <b>Generate an image</b>
+                  <i>Describe a picture and Nova creates it</i>
+                </span>
+              </button>
+            </div>
+          </div>
 
           <div class="composer-right">
             <span class="fast-label">Fast</span>
@@ -367,6 +419,43 @@
     </div>
   </div>
 
+  <!-- Imagine: generate an image from a prompt -->
+  <div id="imagine-modal" class="auth-modal" hidden role="dialog" aria-modal="true"
+       aria-label="Generate an image with Nova">
+    <div class="auth-card imagine-card">
+      <div class="auth-head">
+        <h2 class="auth-title">Imagine</h2>
+        <button class="auth-close" id="imagine-close" type="button" title="Close" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <p class="auth-subtitle">Describe what Nova should draw.</p>
+
+      <label class="auth-field">
+        <span class="auth-label">Prompt</span>
+        <textarea id="imagine-input" class="imagine-textarea" rows="4" maxlength="1000"
+                  placeholder="a sunset over mountains with a lake reflection"></textarea>
+      </label>
+
+      <div class="imagine-examples">
+        <button class="imagine-chip" type="button"
+                data-prompt="a cosy cabin in a snowy forest at night">Cosy cabin</button>
+        <button class="imagine-chip" type="button"
+                data-prompt="a robot astronaut watering plants on a space station">Space bot</button>
+        <button class="imagine-chip" type="button"
+                data-prompt="an underwater city with glowing coral towers">Deep sea</button>
+      </div>
+
+      <button class="auth-submit imagine-submit" id="imagine-generate" type="button">
+        Generate image
+      </button>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="foot">
     <p>
@@ -386,11 +475,16 @@
     </svg>
   </a>
 
+  <input type="file" id="photo-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+  <input type="file" id="doc-input"
+         accept=".pdf,.txt,.md,.markdown,.csv,.json,.py,.js,.jsx,.ts,.tsx,.html,.css,.yml,.yaml,text/*,application/pdf"
+         hidden />
+
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="/static/firebase-config.js?v=14"></script>
-  <script src="/static/auth.js?v=14"></script>
-  <script src="/static/script.js?v=14"></script>
+  <script src="/static/firebase-config.js?v=17"></script>
+  <script src="/static/auth.js?v=17"></script>
+  <script src="/static/script.js?v=17"></script>
   <script>
     (function () {
       if ("serviceWorker" in navigator) {

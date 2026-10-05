@@ -28,6 +28,27 @@ class Settings:
     AI_TTS_MODEL: str = os.getenv("AI_TTS_MODEL", "canopylabs/orpheus-v1-english").strip()
     MAX_SPEECH_CHARS: int = 2000  # text that may be spoken in one call
 
+    # Image understanding + image generation. Groq's chat models are text-only,
+    # so anything visual runs on Gemini.
+    VISION_MODEL: str = os.getenv("VISION_MODEL", "gemini-3.6-flash").strip()
+    IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "gemini-3.6-flash").strip()
+
+    # Upload safety limits.
+    MAX_IMAGES: int = 4
+    MAX_UPLOAD_BYTES: int = 6 * 1024 * 1024
+    MAX_DOC_CHARS: int = 12000  # characters of a document handed to the model
+    MAX_PDF_PAGES: int = 40
+
+    def has_vision_model(self) -> bool:
+        """True when Gemini is configured, so images can be understood."""
+        key = os.getenv("GEMINI_API_KEY", "").strip()
+        return bool(key) and bool(self.VISION_MODEL)
+
+    def has_image_model(self) -> bool:
+        """True when Gemini is configured, so images can be generated."""
+        key = os.getenv("GEMINI_API_KEY", "").strip()
+        return bool(key) and bool(self.IMAGE_MODEL)
+
     @property
     def openai_base_url(self) -> str:
         # Empty means "use the official OpenAI default URL".

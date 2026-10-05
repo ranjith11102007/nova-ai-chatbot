@@ -7,6 +7,9 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .ai_service import (
+    chat_with_attachments,
+    extract_document_text,
+    generate_image,
     get_assistant_reply,
     list_voices,
     stream_assistant_reply,
@@ -14,7 +17,14 @@ from .ai_service import (
     transcribe_audio,
 )
 from .config import PROVIDERS, settings, provider_configured
-from .models import ChatRequest, ChatResponse, SpeechRequest
+from .models import (
+    ChatRequest,
+    ChatResponse,
+    DocumentResponse,
+    ImageRequest,
+    ImageResponse,
+    SpeechRequest,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nova_ai")
@@ -24,6 +34,17 @@ STATIC_DIR = BASE_DIR / "static"
 
 ALLOWED_AUDIO_EXTENSIONS = {"webm", "ogg", "wav", "mp3", "m4a", "mp4"}
 MAX_AUDIO_BYTES = 10 * 1024 * 1024
+
+# Image uploads arrive as data URLs from the browser.
+ALLOWED_IMAGE_PREFIXES = (
+    "data:image/png",
+    "data:image/jpeg",
+    "data:image/jpg",
+    "data:image/webp",
+    "data:image/gif",
+)
+# base64 inflates by ~4/3, so allow a little headroom over the raw byte cap.
+MAX_IMAGE_DATA_URL_CHARS = int(settings.MAX_UPLOAD_BYTES * 1.4)
 
 
 class NoCacheStaticFiles(StaticFiles):
@@ -88,12 +109,45 @@ def list_models():
     }
 
 
+def _clamp_attachments(request: ChatRequest) -> tuple[list[str], list[dict]]:
+    """Validate and cap the attachments that travelled with a chat request."""
+    images: list[str] = []
+    for url in request.images:
+        if not url.startswith(ALLOWED_IMAGE_PREFIXES):
+            raise HTTPException(
+                status_code=400,
+                detail="That image format isn't supported. Use PNG, JPEG, WebP or GIF.",
+            )
+        if len(url) > MAX_IMAGE_DATA_URL_CHARS:
+            raise HTTPException(
+                status_code=400,
+                detail="That image is too large. Please keep images under 6 MB.",
+            )
+        images.append(url)
+        if len(images) >= settings.MAX_IMAGES:
+            break
+
+    documents: list[dict] = []
+    for doc in request.documents:
+        text = (doc.text or "")[: settings.MAX_DOC_CHARS]
+        if text.strip():
+            documents.append({"name": (doc.name or "document")[:200], "text": text})
+        if len(documents) >= settings.MAX_IMAGES:
+            break
+
+    return images, documents
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     """Receive the conversation, get Nova's reply, and return it."""
     messages = _clamp_chat_messages(request)
+    images, documents = _clamp_attachments(request)
 
-    logger.info("Received %d message(s) from the user.", len(messages))
+    logger.info(
+        "Received %d message(s) with %d image(s) and %d document(s).",
+        len(messages), len(images), len(documents),
+    )
 
     if not settings.has_api_key():
         raise HTTPException(
@@ -108,6 +162,20 @@ def chat(request: ChatRequest):
             detail="The server is missing AI_MODEL. Set it in your .env file "
             "(for example AI_MODEL=gpt-4o-mini), then restart the server.",
         )
+
+    if images or documents:
+        try:
+            reply, note = chat_with_attachments(
+                messages,
+                images=images,
+                documents=documents,
+                language=request.language,
+                model=request.model,
+            )
+        except RuntimeError as exc:
+            logger.error("Attachment chat failed: %s", exc)
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return ChatResponse(reply=reply, note=note)
 
     try:
         reply = get_assistant_reply(messages, language=request.language, model=request.model)
@@ -133,12 +201,17 @@ def _clamp_chat_messages(request: ChatRequest) -> list[dict]:
 async def chat_stream(request: ChatRequest):
     """Stream Nova's reply tokens as server-sent events (used by voice chat)."""
     messages = _clamp_chat_messages(request)
+    images, documents = _clamp_attachments(request)
     logger.info("Streaming a reply for %d message(s).", len(messages))
 
     def event_source():
         try:
             for token in stream_assistant_reply(
-                messages, language=request.language, model=request.model
+                messages,
+                language=request.language,
+                model=request.model,
+                images=images,
+                documents=documents,
             ):
                 yield "data: " + json.dumps({"token": token}, ensure_ascii=False) + "\n\n"
         except RuntimeError as exc:
@@ -151,6 +224,41 @@ async def chat_stream(request: ChatRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/image", response_model=ImageResponse)
+def image(request: ImageRequest):
+    """Generate an image from a prompt and return it as a data URL."""
+    logger.info("Generating an image (%d chars of prompt).", len(request.prompt))
+    try:
+        image_url = generate_image(request.prompt, request.model)
+    except RuntimeError as exc:
+        logger.error("Image generation failed: %s", exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return ImageResponse(image=image_url, model=settings.IMAGE_MODEL)
+
+
+@app.post("/api/document", response_model=DocumentResponse)
+async def document(file: UploadFile = File(...)):
+    """Turn an uploaded file (PDF, text, code) into plain text for the model."""
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Could not read that file.")
+    if len(data) > settings.MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail="That file is too large. Please keep files under 6 MB.",
+        )
+
+    filename = file.filename or "document"
+    text = extract_document_text(data, filename, file.content_type or "")
+    if not text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="I couldn't read any text from that file. Scanned PDFs and "
+            "empty files aren't supported yet.",
+        )
+    return DocumentResponse(name=filename, text=text)
 
 
 @app.post("/api/transcribe")

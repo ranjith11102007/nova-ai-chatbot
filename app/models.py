@@ -14,6 +14,13 @@ class ChatMessage(BaseModel):
     content: str = Field(..., max_length=100000)
 
 
+class DocumentPart(BaseModel):
+    """A document the user attached, already extracted to plain text."""
+
+    name: str = Field("", max_length=200)
+    text: str = Field("", max_length=400000)
+
+
 class ChatRequest(BaseModel):
     """The body the frontend sends to POST /api/chat."""
 
@@ -28,12 +35,48 @@ class ChatRequest(BaseModel):
         max_length=120,
         description="Model selector as provider@model-id (empty = server default).",
     )
+    # Attachments travel beside the (text-only) messages so history, titles and
+    # clamping stay exactly as they were.
+    images: List[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description="Attached images as data URLs.",
+    )
+    documents: List[DocumentPart] = Field(
+        default_factory=list,
+        max_length=8,
+        description="Attached documents as already-extracted text.",
+    )
 
 
 class ChatResponse(BaseModel):
     """The body the backend returns from POST /api/chat."""
 
     reply: str
+    note: str = Field(
+        "", description="Optional heads-up, e.g. when a vision model was used."
+    )
+
+
+class ImageRequest(BaseModel):
+    """The body for POST /api/image (text -> generated image)."""
+
+    prompt: str = Field(..., min_length=1, max_length=1000)
+    model: str = Field("", max_length=120)
+
+
+class ImageResponse(BaseModel):
+    """The body the backend returns from POST /api/image."""
+
+    image: str = Field(..., description="Generated image as a data URL.")
+    model: str = ""
+
+
+class DocumentResponse(BaseModel):
+    """The body the backend returns from POST /api/document (file -> text)."""
+
+    name: str = ""
+    text: str = ""
 
 
 class SpeechRequest(BaseModel):
